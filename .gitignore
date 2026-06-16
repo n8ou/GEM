@@ -11,12 +11,10 @@ ENV/
 
 # Environment variables
 .env
-.env.*
 
 # Project specific
 artifacts/
 dataset/
-site/
 .claude/
 .pytest_cache/
 

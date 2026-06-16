@@ -1,0 +1,115 @@
+/* style.css – premium dark theme with glassmorphism */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+:root {
+  --primary-hue: 210; /* cool blue */
+  --primary: hsl(var(--primary-hue), 70%, 55%);
+  --bg: hsl(210, 20%, 12%);
+  --bg-card: rgba(255, 255, 255, 0.07);
+  --text: hsl(0, 0%, 93%);
+  --text-muted: hsl(0, 0%, 60%);
+  --radius: 12px;
+  --spacing: 1.2rem;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: linear-gradient(135deg, hsl(210, 30%, 10%), hsl(210, 20%, 5%));
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+header.hero {
+  background: rgba(255,255,255,0.03);
+  backdrop-filter: blur(12px);
+  padding: var(--spacing) 2rem;
+  text-align: center;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+header.hero h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+}
+
+header.hero .tagline {
+  font-size: 1rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+}
+
+header.hero nav a {
+  color: var(--text);
+  margin: 0 0.8rem;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+
+header.hero nav a:hover {
+  color: var(--primary);
+}
+
+main {
+  flex: 1;
+  max-width: 1100px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+section.section {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  backdrop-filter: blur(8px);
+}
+
+section.section h2 {
+  font-size: 1.8rem;
+  margin-bottom: 0.8rem;
+  color: var(--primary);
+}
+
+section.section p,
+section.section li {
+  color: var(--text-muted);
+}
+
+ul {
+  list-style: disc inside;
+  margin-left: 1rem;
+}
+
+pre.mermaid {
+  background: rgba(255,255,255,0.06);
+  padding: 1rem;
+  border-radius: var(--radius);
+  overflow-x: auto;
+}
+
+footer.footer {
+  text-align: center;
+  padding: 1rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  header.hero h1 { font-size: 2rem; }
+  header.hero nav a { margin: 0 0.4rem; }
+}

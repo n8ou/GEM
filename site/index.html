@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FaceCore – نظام التعرف على الوجوه</title>
+  <link rel="stylesheet" href="style.css" />
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <header class="hero">
+    <h1>FaceCore</h1>
+    <p class="tagline">نظام إنتاجي للتعرف على الوجوه – Clean Architecture, FastAPI, ONNX, FAISS</p>
+    <nav>
+      <a href="#overview">نظرة عامة</a>
+      <a href="#architecture">الهندسة المعمارية</a>
+      <a href="#components">المكوّنات</a>
+      <a href="#workflow">سير العمل</a>
+      <a href="#setup">التثبيت والبدء</a>
+    </nav>
+  </header>
+
+  <main>
+    <section id="overview" class="section">
+      <h2>نظرة عامة</h2>
+      <p>
+        FaceCore هو نظام كامل للتعرف على الوجوه يُست‑خدم في بيئات الإنتاج. يدمج
+        مكتبة <strong>FastAPI</strong> لتقديم واجهة HTTP، و <strong>RetinaFace</strong>
+        للكشف عن الوجوه، و <strong>ArcFace</strong> لإنشاء المتجهات المميّزة، مع تخزين
+        المتجهات في <strong>FAISS</strong> للبحث القريب. يطبق نمط الهندسة النظيفة
+        (Clean Architecture) بحيث تكون جميع الطبقات منفصلة عن بعضها.
+      </p>
+    </section>
+
+    <section id="architecture" class="section">
+      <h2>الهندسة المعمارية</h2>
+      <p>المخطط التالي يوضح تدفق البيانات عبر الطبقات.</p>
+      <pre class="mermaid">
+        graph LR
+        subgraph API[FastAPI Layer]
+          A[GET /health] -->|تأكد من الحالة| B[Health Endpoint]
+          C[POST /recognize] -->|صورة| D[Recognition Endpoint]
+          E[POST /enroll] -->|صور + person_id| F[Enroll Endpoint]
+        end
+        subgraph Core[Core Logic]
+          D --> G[RecognitionPipeline]
+          F --> G
+          G -->|detect| H[FaceDetector]
+          G -->|embed| I[FaceEmbedder]
+          G -->|match| J[Matcher]
+          J --> K[FaissVectorStore]
+        end
+        subgraph Adapters[Adapters]
+          H -->|RetinaFace| L[RetinaFaceDetector]
+          I -->|ONNX / Torch| M[ArcFace (OnnxArcFace / TorchArcFace)]
+          K -->|faiss‑cpu| N[FAISS Index]
+        end
+        API --> Core --> Adapters
+      </pre>
+    </section>
+
+    <section id="components" class="section">
+      <h2>المكوّنات الرئيسة</h2>
+      <ul>
+        <li><strong>Detection</strong>: <code>facecore/detection</code> – واجهة <code>FaceDetector</code> وتنفيذ <code>RetinaFaceDetector</code> باستخدام insightface.</li>
+        <li><strong>Embedding</strong>: <code>facecore/embedding</code> – واجهة <code>FaceEmbedder</code> مع <code>OnnxArcFace</code> (سرعة) و <code>TorchArcFace</code> (للتدريب).</li>
+        <li><strong>Vector Store</strong>: <code>facecore/recognition/vector_store.py</code> – طبقة تخزين FAISS مع ملفات <code>faces.faiss</code> و <code>faces_meta.json</code>.</li>
+        <li><strong>Matcher</strong>: <code>facecore/recognition/matcher.py</code> – يطابق المتجه مع قاعدة البيانات ويطبق عتبة <code>match_threshold</code>.</li>
+        <li><strong>Pipeline</strong>: <code>facecore/inference/pipeline.py</code> – يربط الكشف، المحاذاة (<code>facecore/preprocessing/alignment.py</code>), التضمين والـ matching في خطوة واحدة.</li>
+        <li><strong>API</strong>: <code>facecore/api/main.py</code> – نقاط النهاية <code>/health</code>, <code>/recognize</code>, <code>/enroll</code>, <code>/verify</code>. جميعها محمية بمفتاح API ومحدودة بمعدل طلبات.</li>
+        <li><strong>Configuration</strong>: <code>facecore/config.py</code> – يستخدم <code>pydantic‑settings</code> قراءة المتغيّرات من <code>.env</code>. القيم في <code>.env.example</code> توضح كل إعداد.</li>
+        <li><strong>Training</strong>: <code>scripts/train.py</code> + <code>facecore/training</code> – إعداد بيانات، تدريب نموذج ArcFace، حفظ checkpoint.</li>
+      </ul>
+    </section>
+
+    <section id="workflow" class="section">
+      <h2>سير العمل (Recognition Flow)</h2>
+      <ol>
+        <li>العميل يرسل صورة عبر <code>POST /recognize</code>.</li>
+        <li>الـ FastAPI يمرّر الطلب إلى <code>RecognitionPipeline.recognize</code>.</li>
+        <li>المكتشف <code>RetinaFaceDetector</code> يُعيد قائمة <code>DetectedFace</code> (مربعات + معالم).</li>
+        <li>كل وجه يُمحاذَ عبر <code>align_face</code> لتوحيد الحجم 112×112.</li>
+        <li>المحاذاة تُحوَّل إلى تمثيل Tensor ثم تُمرّر إلى <code>FaceEmbedder</code> (ONNX أو Torch) لتوليد متجه L2‑normalized.</li>
+        <li>المتجه يُستَـخدم في <code>Matcher.identify</code> للبحث في <code>FaissVectorStore</code>، وتُسترجع أعلى تشابه لكل هوية.</li>
+        <li>تُقارن النتيجة بالعتبة <code>match_threshold</code>؛ إذا كان أعلى من العتبة تُعيد هوية معروفة، وإلا تُعيد “unknown”.</li>
+        <li>تُعيد API كائن JSON يحتوي على المربعات، الهوية، ومستوى التشابه.</li>
+      </ol>
+    </section>
+
+    <section id="setup" class="section">
+      <h2>التثبيت والبدء</h2>
+      <pre>
+# 1️⃣ استنساخ المستودع
+git clone <repo‑url>
+cd pro
+
+# 2️⃣ إنشاء بيئة افتراضية (Python 3.12 يفضَّل)
+py -3.12 -m venv .venv
+.\.venv\Scripts\activate
+
+# 3️⃣ تثبيت المتطلبات (ملف requirements.txt)
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+
+# 4️⃣ إعداد المتغيّرات
+copy .env.example .env
+# عدّل .env إذا لزم الأمر (مسارات النموذج، المفاتيح، …)
+
+# 5️⃣ تشغيل الخادم
+python -m uvicorn facecore.api.main:app --host 0.0.0.0 --port 8000
+      </pre>
+      <p>
+        بعد ذلك يمكن اختبار الواجهة عبر <code>curl</code> أو أداة مثل Postman.
+      </p>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>© 2024‑2026 FaceCore – تم بناءه باستخدام Python, FastAPI, ONNX, FAISS.</p>
+  </footer>
+
+  <!-- Mermaid library (optional – loads on demand) -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({startOnLoad:true});</script>
+</body>
+</html>
