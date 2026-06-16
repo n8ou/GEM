@@ -21,6 +21,8 @@ class IdentityModel(BaseModel):
 class FaceResult(BaseModel):
     bbox: BoxModel
     identity: IdentityModel
+    is_live: bool = True
+    live_score: float = 1.0
 
 
 class RecognizeResponse(BaseModel):

@@ -69,11 +69,15 @@ tensorboard --logdir artifacts/runs
 curl -H "X-API-Key: $FACECORE_API_KEY" -F file=@face.jpg http://localhost:8000/recognize
 ```
 
-## Docker
+## Docker / Deployment
 
 ```bash
+python scripts/fetch_models.py                          # provision model weights (idempotent)
 docker compose -f docker/docker-compose.yml up --build
 ```
+
+See **[DEPLOYMENT.md](DEPLOYMENT.md)** for the full production guide (secrets, GPU,
+hardening) and **[EVALUATION.md](EVALUATION.md)** for measured accuracy.
 
 ## Tests
 

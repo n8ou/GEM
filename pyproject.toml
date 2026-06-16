@@ -17,6 +17,9 @@ where = ["src"]
 line-length = 100
 target-version = "py312"
 src = ["src"]
+# Vendored verbatim from minivision-ai/Silent-Face-Anti-Spoofing (Apache-2.0);
+# kept structurally identical so the upstream weights load — not linted.
+extend-exclude = ["src/facecore/liveness/minifasnet.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "PL"]

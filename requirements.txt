@@ -4,6 +4,7 @@ torchvision>=0.18.0
 
 # --- Face models / CV ---
 insightface>=0.7.3
+ultralytics>=8.2.0        # YOLO-Face detector (FACECORE_DETECTOR=yolo)
 onnx>=1.16.0
 onnxruntime-gpu>=1.18.0   # falls back to CPU EP automatically if no CUDA
 opencv-python-headless>=4.10.0

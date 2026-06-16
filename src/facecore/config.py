@@ -28,15 +28,25 @@ class Settings(BaseSettings):
 
     # --- Models ---
     model_dir: Path = Path("./artifacts/models")
-    detector: str = "retinaface"
+    detector: Literal["retinaface", "yolo"] = "retinaface"
     embedder: str = "arcface_r100"
     embedding_dim: int = 512
+
+    # YOLO-Face weights (relative to model_dir, or an absolute path). The model
+    # must expose 5 facial keypoints (eyes, nose, mouth corners) so we can align
+    # to the ArcFace template — e.g. a YOLOv8/YOLOv11-face checkpoint.
+    yolo_weights: str = "yolo11n-pose_widerface.pt"
 
     # --- Recognition thresholds ---
     match_threshold: float = Field(0.42, ge=-1.0, le=1.0)
     detect_score_threshold: float = Field(0.6, ge=0.0, le=1.0)
     blur_threshold: float = Field(45.0, ge=0.0)
     min_face_size: int = Field(32, ge=8)
+
+    # --- Liveness / anti-spoofing (Silent-Face) ---
+    liveness_enabled: bool = True
+    liveness_threshold: float = Field(0.5, ge=0.0, le=1.0)  # min "real" prob to accept a live face
+    liveness_model_subdir: str = "anti_spoof"               # under model_dir
 
     # --- Vector store ---
     index_path: Path = Path("./artifacts/index/faces.faiss")

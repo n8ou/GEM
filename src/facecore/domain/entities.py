@@ -28,10 +28,15 @@ class BBox:
 
 @dataclass(frozen=True, slots=True)
 class DetectedFace:
-    """A detected face: box, 5-point landmarks (eyes, nose, mouth corners)."""
+    """A detected face: box + optional 5-point landmarks (eyes, nose, mouth corners).
+
+    Landmark-capable detectors (RetinaFace, YOLO-face *pose* models) populate
+    ``landmarks`` for similarity-transform alignment. Box-only detectors leave it
+    ``None`` and callers fall back to bounding-box alignment.
+    """
 
     bbox: BBox
-    landmarks: np.ndarray  # shape (5, 2), float32
+    landmarks: np.ndarray | None  # shape (5, 2), float32, or None
 
     def is_valid(self, min_size: int) -> bool:
         return self.bbox.width >= min_size and self.bbox.height >= min_size
@@ -59,3 +64,5 @@ class RecognitionResult:
     bbox: BBox
     identity: Identity
     embedding: np.ndarray = field(repr=False)
+    is_live: bool = True
+    live_score: float = 1.0

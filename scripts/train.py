@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 
 from facecore.config import get_settings
-from facecore.detection.retinaface import RetinaFaceDetector
+from facecore.inference.factory import build_detector
 from facecore.training.dataset import FaceFolderDataset
 from facecore.training.trainer import TrainConfig, Trainer
 from facecore.utils.device import resolve_device
@@ -31,7 +31,7 @@ def main() -> None:
     args = parse_args()
     settings = get_settings()
     device = resolve_device(settings.device)
-    detector = RetinaFaceDetector(settings, device)
+    detector = build_detector(settings, device)
 
     train_ds = FaceFolderDataset(settings, detector, split="train")
     val_ds = FaceFolderDataset(settings, detector, split="val")

@@ -12,6 +12,10 @@ class Matcher:
         self._store = store
         self._threshold = threshold
 
+    @property
+    def store(self) -> FaissVectorStore:
+        return self._store
+
     def identify(self, embedding: np.ndarray) -> Identity:
         results = self._store.search(embedding, top_k=1)
         if not results:

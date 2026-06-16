@@ -65,8 +65,12 @@ class Trainer:
         self._backbone = build_backbone(cfg.backbone, settings.embedding_dim, dropout=0.4).to(self._device)
         self._head = ArcMarginHead(settings.embedding_dim, num_classes).to(self._device)
         self._criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+        # Clip backbone AND head together — the high-scale (s=64) margin head is
+        # the most divergence-prone part, so leaving it unclipped lets gradients
+        # explode to NaN once warmup hands over the full LR.
+        self._params = [*self._backbone.parameters(), *self._head.parameters()]
         self._optim = torch.optim.SGD(
-            [*self._backbone.parameters(), *self._head.parameters()],
+            self._params,
             lr=cfg.lr,
             momentum=0.9,
             weight_decay=cfg.weight_decay,
@@ -123,9 +127,15 @@ class Trainer:
                 emb = self._backbone(imgs)
                 logits = self._head(emb, labels)
                 loss = self._criterion(logits, labels)
+            # Guard: a non-finite loss must never reach the weights, or the whole
+            # model turns to NaN for the rest of the run.
+            if not torch.isfinite(loss):
+                log.warning("non-finite loss — skipping step", extra={"extra_fields": {"step": step}})
+                self._optim.zero_grad(set_to_none=True)
+                continue
             self._scaler.scale(loss).backward()
             self._scaler.unscale_(self._optim)
-            nn.utils.clip_grad_norm_(self._backbone.parameters(), self._cfg.grad_clip)
+            nn.utils.clip_grad_norm_(self._params, self._cfg.grad_clip)
             self._scaler.step(self._optim)
             self._scaler.update()
             running += loss.item()
@@ -150,18 +160,33 @@ class Trainer:
             return 0.0
         E = torch.cat(embs)
         L = torch.cat(labels)
-        # Sample balanced positive/negative pairs to estimate verification acc.
+        # NaN guard: a diverged model yields non-finite embeddings; report 0 so it
+        # is never mistaken for a good checkpoint (and never saved as "best").
+        if not torch.isfinite(E).all():
+            log.warning("non-finite embeddings during validation — model diverged")
+            return 0.0
         n = min(2048, E.shape[0])
         idx = torch.randperm(E.shape[0])[:n]
         E, L = E[idx], L[idx]
         sims = E @ E.T
-        same = (L[:, None] == L[None, :]).float()
+        same = (L[:, None] == L[None, :])
         mask = ~torch.eye(n, dtype=torch.bool)
         sims_f, same_f = sims[mask], same[mask]
+        # Balance positives/negatives — otherwise the ~99%-negative pair set is
+        # trivially maximized by always predicting "different" (≈0.99, meaningless).
+        pos = sims_f[same_f]
+        neg = sims_f[~same_f]
+        if pos.numel() == 0 or neg.numel() == 0:
+            return 0.0
+        k = min(pos.numel(), neg.numel())
+        pos = pos[torch.randperm(pos.numel())[:k]]
+        neg = neg[torch.randperm(neg.numel())[:k]]
+        sims_b = torch.cat([pos, neg])
+        same_b = torch.cat([torch.ones(k), torch.zeros(k)])
         best_acc = 0.0
-        for thr in torch.linspace(0.1, 0.7, 25):
-            pred = (sims_f > thr).float()
-            best_acc = max(best_acc, (pred == same_f).float().mean().item())
+        for thr in torch.linspace(-0.2, 0.9, 45):
+            pred = (sims_b > thr).float()
+            best_acc = max(best_acc, (pred == same_b).float().mean().item())
         return best_acc
 
     def fit(self) -> None:

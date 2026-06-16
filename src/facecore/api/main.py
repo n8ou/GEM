@@ -27,7 +27,7 @@ from facecore.api.schemas import (
 )
 from facecore.api.security import RateLimiter, require_api_key, validate_and_decode
 from facecore.config import get_settings
-from facecore.inference.factory import build_pipeline, build_store
+from facecore.inference.factory import build_pipeline
 from facecore.logging_conf import configure_logging, get_logger
 from facecore.recognition.matcher import Matcher
 from facecore.utils.device import resolve_device
@@ -41,7 +41,9 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     app.state.settings = settings
     app.state.pipeline = build_pipeline(settings)
-    app.state.store = build_store(settings)
+    # Share the pipeline's store so /enroll and /recognize hit the SAME index
+    # (building a second store left recognize querying an empty one).
+    app.state.store = app.state.pipeline.store
     app.state.device = str(resolve_device(settings.device))
     app.state.limiter = RateLimiter(settings.rate_limit_per_min)
     log.info("API ready")
@@ -75,6 +77,8 @@ async def recognize(request: Request, file: UploadFile = File(...)) -> Recognize
                 similarity=round(r.identity.similarity, 4),
                 is_known=r.identity.is_known,
             ),
+            is_live=r.is_live,
+            live_score=r.live_score,
         )
         for r in results
     ]

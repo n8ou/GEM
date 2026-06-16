@@ -22,7 +22,7 @@ from torch.utils.data import Dataset
 from facecore.config import Settings
 from facecore.detection.base import FaceDetector
 from facecore.logging_conf import get_logger
-from facecore.preprocessing.alignment import align_face
+from facecore.preprocessing.alignment import align_detected_face
 from facecore.preprocessing.augmentation import to_model_tensor, train_transform
 from facecore.preprocessing.validation import assess_quality, load_image_safe
 
@@ -103,7 +103,7 @@ class FaceFolderDataset(Dataset):
                 if not faces:
                     dropped += 1
                     continue
-                aligned = align_face(img, faces[0].landmarks)
+                aligned = align_detected_face(img, faces[0])
                 np.save(cache_file, aligned)
                 self._samples.append(Sample(str(img_path), label, str(cache_file)))
         out.parent.mkdir(parents=True, exist_ok=True)

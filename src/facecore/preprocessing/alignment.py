@@ -9,6 +9,8 @@ import cv2
 import numpy as np
 from skimage import transform as sk_transform
 
+from facecore.domain.entities import BBox, DetectedFace
+
 # Canonical 5-point template for 112x112 ArcFace input (x, y).
 _ARCFACE_TEMPLATE = np.array(
     [
@@ -34,3 +36,37 @@ def align_face(image_bgr: np.ndarray, landmarks: np.ndarray, size: int = OUTPUT_
     matrix = tform.params[0:2, :]
     aligned = cv2.warpAffine(image_bgr, matrix, (size, size), borderValue=0.0)
     return aligned
+
+
+def align_by_bbox(
+    image_bgr: np.ndarray, bbox: BBox, size: int = OUTPUT_SIZE, margin: float = 0.15
+) -> np.ndarray:
+    """Fallback alignment for box-only detectors (no landmarks).
+
+    Takes a centered square crop around the box (expanded by ``margin``) and
+    resizes to ``size``. Lacks landmark-based rotation normalization, so embedding
+    quality is lower than :func:`align_face` — but keeps the pipeline working with
+    detectors that emit only bounding boxes.
+    """
+    h, w = image_bgr.shape[:2]
+    cx = (bbox.x1 + bbox.x2) / 2.0
+    cy = (bbox.y1 + bbox.y2) / 2.0
+    half = max(bbox.width, bbox.height) * (1.0 + margin) / 2.0
+    x1 = max(0, int(round(cx - half)))
+    y1 = max(0, int(round(cy - half)))
+    x2 = min(w, int(round(cx + half)))
+    y2 = min(h, int(round(cy + half)))
+    crop = image_bgr[y1:y2, x1:x2]
+    if crop.size == 0:
+        crop = image_bgr
+    return cv2.resize(crop, (size, size), interpolation=cv2.INTER_LINEAR)
+
+
+def align_detected_face(
+    image_bgr: np.ndarray, face: DetectedFace, size: int = OUTPUT_SIZE
+) -> np.ndarray:
+    """Align a detected face: 5-point similarity transform if landmarks exist,
+    else a bounding-box crop. Single entry point for all detector backends."""
+    if face.landmarks is not None:
+        return align_face(image_bgr, face.landmarks, size)
+    return align_by_bbox(image_bgr, face.bbox, size)
