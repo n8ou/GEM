@@ -1,0 +1,10 @@
+artifacts/
+dataset/
+**/__pycache__/
+*.pyc
+.env
+.git/
+.venv/
+tests/
+*.faiss
+runs/

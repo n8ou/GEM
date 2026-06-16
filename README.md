@@ -1,0 +1,83 @@
+# facecore — Production Face Recognition System
+
+A modular, scalable face **detection → embedding → recognition** pipeline with
+custom ArcFace training, ONNX export, a secure FastAPI inference service, real-time
+webcam recognition, and Docker deployment.
+
+## Architecture (Clean Architecture / Ports & Adapters)
+
+```
+            ┌──────────────────────────────────────────────┐
+ API / CLI  │  api/ (FastAPI)   scripts/   inference/realtime │   ← delivery
+            ├──────────────────────────────────────────────┤
+ use-cases  │  inference/pipeline   training/trainer          │   ← orchestration
+            ├──────────────────────────────────────────────┤
+ interfaces │  detection.base   embedding.base                │   ← ports
+            ├──────────────────────────────────────────────┤
+ adapters   │  RetinaFace  ArcFace(ONNX/Torch)  FAISS store    │   ← implementations
+            ├──────────────────────────────────────────────┤
+ domain     │  entities (BBox, Identity, ...)  config          │   ← pure core
+            └──────────────────────────────────────────────┘
+```
+
+The pipeline depends only on the `FaceDetector` / `FaceEmbedder` interfaces;
+concrete models are wired in `inference/factory.py` (the composition root), so you
+can swap RetinaFace→YOLO-Face or ArcFace→FaceNet without touching business logic.
+
+## Quickstart
+
+```bash
+python -m venv .venv && . .venv/Scripts/activate     # Windows
+pip install -r requirements.txt
+pip install -e .
+cp .env.example .env            # then set FACECORE_API_KEY
+
+# Serve inference API (downloads InsightFace buffalo_l on first run)
+uvicorn facecore.api.main:app --host 0.0.0.0 --port 8000
+
+# Real-time webcam
+python -m facecore.inference.realtime
+```
+
+## Dataset layout
+
+```
+dataset/
+  person_1/ img1.jpg img2.jpg ...
+  person_2/ img1.jpg ...
+```
+
+## Train a custom model
+
+```bash
+python scripts/train.py --backbone r50 --epochs 40 --batch-size 128
+python scripts/train.py --resume                 # exact-state resume
+python scripts/export_onnx.py --backbone r50     # -> artifacts/models/arcface_r50.onnx
+tensorboard --logdir artifacts/runs
+```
+
+## API
+
+| Method | Path        | Purpose                          |
+|--------|-------------|----------------------------------|
+| GET    | `/health`   | liveness, device, index size     |
+| POST   | `/recognize`| multi-face recognition (1 image) |
+| POST   | `/enroll`   | add person face(s) to gallery    |
+| POST   | `/verify`   | 1:1 similarity between 2 images  |
+
+```bash
+curl -H "X-API-Key: $FACECORE_API_KEY" -F file=@face.jpg http://localhost:8000/recognize
+```
+
+## Docker
+
+```bash
+docker compose -f docker/docker-compose.yml up --build
+```
+
+## Tests
+
+```bash
+pytest -q
+ruff check src
+```

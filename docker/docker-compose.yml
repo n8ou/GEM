@@ -1,0 +1,28 @@
+services:
+  facecore-api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: facecore:1.0.0
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../.env
+    environment:
+      FACECORE_ENV: production
+      FACECORE_DEVICE: auto
+    volumes:
+      - ../artifacts:/app/artifacts          # models, index, checkpoints persist
+      - ../dataset:/app/dataset:ro
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    # ---- For GPU: uncomment, use an onnxruntime-gpu/CUDA base image ----
+    # gpus: all
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
